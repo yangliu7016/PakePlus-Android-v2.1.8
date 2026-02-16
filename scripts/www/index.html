@@ -566,6 +566,26 @@
         }
 
 
+        /* 移动端输入法遮挡修复 */
+        @media (max-width: 600px) {
+            .custom-modal {
+                /* 改用 flex-start + margin:auto 方式居中，避免键盘弹出时顶部被切 */
+                align-items: flex-start;
+                padding-top: 20px;
+                padding-bottom: 20px;
+                overflow-y: auto; /* 允许整个遮罩层滚动 */
+            }
+            .modal-content {
+                margin: auto; /* 在空间足够时垂直居中 */
+                /* 移除 max-height 限制，让容器滚动 */
+                max-height: none !important; 
+                width: 95%;
+            }
+            /* 针对特定 modal 的内部滚动容器取消限制 */
+            #checkinModal .modal-content {
+                max-height: none !important; 
+            }
+        }
     </style>
 </head>
 <body onclick="if(event.target.id === 'todoSelectModal') closeTodoSelectModal(); else closeAllMenus(event);">
@@ -1140,7 +1160,7 @@
         <div class="modal-content" style="max-width: 450px; max-height: 90vh; overflow-y: auto;">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; position:sticky; top:0; background:var(--bg-card); z-index:10; padding-bottom:12px; border-bottom:1px solid var(--border);">
                 <div style="display:flex; align-items:center; gap:8px;">
-                    <div class="modal-title" id="checkinModalTitle" style="color:var(--primary); margin:0;">打卡</div>
+                    <div class="modal-title" id="checkinModalTitle" style="color:var(--primary); margin:0;">📝 打卡</div>
                     <span onclick="toggleCheckinMode()" style="cursor:pointer; font-size:12px; color:var(--text-sub); border:1px solid var(--border); padding:1px 5px; border-radius:4px;" title="手动切换模式">⇄</span>
                     <span id="checkinModalDayTypeBadge" style="display:none;background:var(--info);color:#fff;padding:2px 8px;border-radius:12px;font-size:10px;">周末</span>
                 </div>
@@ -1223,7 +1243,7 @@
                             <div id="checkinModalReviewTags" class="chips-container" style="margin-bottom:8px;"></div>
                             <textarea id="checkinModalReviewInsight" placeholder="清单..." rows="2"></textarea>
                             <div style="text-align:right; margin-top:8px;">
-                                <button class="btn-mini" style="background:var(--success); color:#fff; width:auto; padding:6px 16px;" onclick="addReviewListItem()">➕ 添加清单项</button>
+                                <button class="btn-mini" style="background:var(--success); color:#fff; width:auto; padding:6px 16px;" onclick="addReviewListItem()">➕ 添加</button>
                             </div>
                             <!-- Removed checkinModalDailyList -->
                         </div>
@@ -2913,14 +2933,14 @@
                 // 切换到复盘
                 checkinArea.style.display = 'none';
                 reviewArea.style.display = 'block';
-                modalTitle.innerText = '复盘';
+                modalTitle.innerText = '🤔 复盘';
                 updateCheckinModalHeaderButtons(true);
                 loadCheckinModalReview(getLocalTodayStr());
             } else {
                 // 切换到打卡
                 checkinArea.style.display = 'block';
                 reviewArea.style.display = 'none';
-                modalTitle.innerText = '打卡';
+                modalTitle.innerText = '📝 打卡';
                 updateCheckinModalHeaderButtons(false);
                 initCheckinModalForm();
             }
@@ -2948,7 +2968,7 @@
                 // 已打卡，显示复盘界面
                 if (checkinArea) checkinArea.style.display = 'none';
                 if (reviewArea) reviewArea.style.display = 'block';
-                if (modalTitle) modalTitle.innerText = '复盘';
+                if (modalTitle) modalTitle.innerText = '🤔 复盘';
                 updateCheckinModalHeaderButtons(true);
                 
                 // 加载当天的复盘内容
@@ -2957,7 +2977,7 @@
                 // 未打卡，显示打卡表单
                 if (checkinArea) checkinArea.style.display = 'block';
                 if (reviewArea) reviewArea.style.display = 'none';
-                if (modalTitle) modalTitle.innerText = '打卡';
+                if (modalTitle) modalTitle.innerText = '📝 打卡';
                 updateCheckinModalHeaderButtons(false);
                 
                 initCheckinModalForm();
@@ -10844,6 +10864,18 @@
             ]
         });
     }
+
+    // -----------------------------------------------------------
+    // 移动端键盘遮挡修复：当输入框获得焦点时，滚动到可视区域
+    // -----------------------------------------------------------
+    document.addEventListener('focusin', function(e) {
+        if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
+            // 延迟以等待键盘弹出动画完成
+            setTimeout(() => {
+                e.target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }, 300);
+        }
+    });
 
     init();
 </script>
