@@ -10866,16 +10866,90 @@
     }
 
     // -----------------------------------------------------------
-    // 移动端键盘遮挡修复：当输入框获得焦点时，滚动到可视区域
+    // 移动端键盘遮挡修复：当输入框获得焦点时，增加底部填充并滚动
     // -----------------------------------------------------------
-    document.addEventListener('focusin', function(e) {
-        if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
-            // 延迟以等待键盘弹出动画完成
-            setTimeout(() => {
-                e.target.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            }, 300);
-        }
-    });
+    let activeInput = null;
+    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+
+    if (isMobile) {
+        // 创建一个用于撑开底部的空div (针对主页面)
+        const spacer = document.createElement('div');
+        spacer.style.height = '0';
+        spacer.style.transition = 'height 0.3s';
+        document.body.appendChild(spacer);
+
+        // 监听焦点事件
+        document.addEventListener('focusin', function(e) {
+            if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
+                activeInput = e.target;
+                
+                // 检查是否在 Modal 中
+                const modalContent = activeInput.closest('.modal-content');
+                
+                if (modalContent) {
+                    // 如果在 Modal 中，给 Modal 内容底部增加 padding
+                    // 同样增加约 40vh 的高度，确保能滚动到中间
+                    modalContent.style.paddingBottom = '40vh';
+                    modalContent.style.transition = 'padding-bottom 0.3s';
+                } else {
+                    // 如果在主页面，给 body spacer 增加高度
+                    spacer.style.height = '40vh'; 
+                }
+
+                // 延迟滚动，等待键盘弹出动画
+                setTimeout(() => {
+                    if (activeInput === e.target) {
+                        e.target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    }
+                }, 300);
+                // 二次检查
+                setTimeout(() => {
+                    if (activeInput === e.target) {
+                        e.target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    }
+                }, 600);
+            }
+        });
+
+        // 监听失焦事件
+        document.addEventListener('focusout', function(e) {
+            if (e.target === activeInput) {
+                // 记录当前 activeInput，用于延迟判断
+                const currentInput = activeInput;
+                
+                setTimeout(() => {
+                    // 如果当前没有新的焦点或者是body，则重置
+                    if (!document.activeElement || 
+                        (document.activeElement.tagName !== 'INPUT' && document.activeElement.tagName !== 'TEXTAREA')) {
+                        
+                        // 恢复主页面 spacer
+                        spacer.style.height = '0';
+                        
+                        // 恢复 Modal padding
+                        // 注意：这里需要恢复刚才设置 padding 的那个 modalContent
+                        // 我们可以尝试查找所有有 padding 的 modalContent 并重置，或者只重置 activeInput 所在的
+                        // 为简单起见，重置所有 .modal-content 的 padding-bottom (除了原本 CSS 定义的)
+                        // 但更好的方式是只重置刚才那个。由于 activeInput 可能已经变了，我们用 currentInput 查找
+                        if (currentInput) {
+                            const modalContent = currentInput.closest('.modal-content');
+                            if (modalContent) {
+                                modalContent.style.paddingBottom = ''; // 恢复 CSS 默认值 (通常是 24px)
+                            }
+                        }
+                        
+                        activeInput = null;
+                    }
+                }, 100);
+            }
+        });
+        
+        // 监听resize事件
+        window.addEventListener('resize', () => {
+            if (activeInput) {
+                activeInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+        });
+    }
 
     init();
 </script>
