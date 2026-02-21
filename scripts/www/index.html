@@ -682,8 +682,8 @@
                 </div>
             </div>
             <div class="row">
-                <div class="input-group"><label class="input-label">入睡 <span id="targetSleep" style="opacity:0.6;font-weight:normal"></span></label><input type="time" id="sleepInput" value="00:00"></div>
-                <div class="input-group"><label class="input-label">起床 <span id="targetWake" style="opacity:0.6;font-weight:normal"></span></label><input type="time" id="wakeInput" value="08:30"></div>
+                <div class="input-group"><label class="input-label" style="justify-content:flex-start; align-items:center;">入睡 <span id="targetSleep" style="opacity:0.6;font-weight:normal; margin-left:4px;"></span></label><input type="time" id="sleepInput" value="00:00"></div>
+                <div class="input-group"><label class="input-label" style="justify-content:flex-start; align-items:center;">起床 <span id="targetWake" style="opacity:0.6;font-weight:normal; margin-left:4px;"></span></label><input type="time" id="wakeInput" value="08:30"></div>
             </div>
             <div class="input-group"><label class="input-label">专注 (h)</label><input type="number" step="0.1" id="studyInput" placeholder="时长"></div>
             <div id="strategyArea" class="chips-container" style="margin-bottom:15px;"></div>
@@ -1182,14 +1182,14 @@
                     <div class="row">
                         <div class="input-group">
                             <div style="display:flex; justify-content:space-between; align-items:center;">
-                                <label class="input-label" style="margin-bottom:0">入睡 <span id="checkinModalTargetSleep" style="opacity:0.6;font-weight:normal"></span> <span id="checkinModalSleepDayIndicator" style="font-size:10px; margin-left:5px; padding:1px 4px; border-radius:4px; display:none;"></span></label>
+                                <label class="input-label" style="margin-bottom:0; justify-content:flex-start; align-items:center;">入睡 <span id="checkinModalTargetSleep" style="opacity:0.6;font-weight:normal; margin-left:4px;"></span> <span id="checkinModalSleepDayIndicator" style="font-size:10px; margin-left:5px; padding:1px 4px; border-radius:4px; display:none;"></span></label>
                                 <span class="btn-mini" style="background:var(--time); color:#fff; padding:2px 6px; font-size:10px;" onclick="setInputToNow('checkinModalSleepInput'); calculateCheckinModalPenalty();">此刻</span>
                             </div>
                             <input type="time" id="checkinModalSleepInput" value="00:00" onchange="calculateCheckinModalPenalty()" oninput="calculateCheckinModalPenalty()">
                         </div>
                         <div class="input-group">
                             <div style="display:flex; justify-content:space-between; align-items:center;">
-                                <label class="input-label" style="margin-bottom:0">起床 <span id="checkinModalTargetWake" style="opacity:0.6;font-weight:normal"></span></label>
+                                <label class="input-label" style="margin-bottom:0; justify-content:flex-start; align-items:center;">起床 <span id="checkinModalTargetWake" style="opacity:0.6;font-weight:normal; margin-left:4px;"></span></label>
                                 <span class="btn-mini" style="background:var(--time); color:#fff; padding:2px 6px; font-size:10px;" onclick="setInputToNow('checkinModalWakeInput'); calculateCheckinModalPenalty();">此刻</span>
                             </div>
                             <input type="time" id="checkinModalWakeInput" value="08:30" onchange="calculateCheckinModalPenalty()" oninput="calculateCheckinModalPenalty()">
@@ -1198,7 +1198,7 @@
                     <div class="input-group"><label class="input-label">专注 (h)</label><input type="number" step="0.1" id="checkinModalStudyInput" placeholder="时长" oninput="calculateCheckinModalPenalty()"></div>
                     
                     <div class="input-group" id="useTimeBankGroup" style="display:none; align-items: center; justify-content: space-between; margin-top: 8px;">
-                        <label class="input-label" style="margin-bottom:0; cursor:pointer;" for="useTimeBankCheckbox">使用时间银行抵扣 (<span id="timeBankBalanceDisplay">0</span>h)</label>
+                        <label class="input-label" style="margin-bottom:0; cursor:pointer; justify-content:flex-start; align-items:center;" for="useTimeBankCheckbox">使用时间银行抵扣 (<span id="timeBankBalanceDisplay">0</span>h)</label>
                         <input type="checkbox" id="useTimeBankCheckbox" onchange="calculateCheckinModalPenalty(); updateTimeBankCheckboxStyle();" style="width:20px; height:20px;">
                     </div>
 
@@ -1209,7 +1209,7 @@
                         </div>
                         <div id="checkinModalPenaltyReasonBox" style="display:none;">
                             <div class="input-group">
-                                <label class="input-label">修改原因 <span style="color:var(--danger);">*</span></label>
+                                <label class="input-label" style="justify-content:flex-start; align-items:center;">修改原因 <span style="color:var(--danger); margin-left:2px;">*</span></label>
                                 <textarea id="checkinModalPenaltyReason" placeholder="请填写修改惩罚金的原因..." rows="2"></textarea>
                             </div>
                         </div>
@@ -4465,20 +4465,24 @@
             let applyPenalty = true;
             
             // Check if Time Bank has enough balance
-            if (useTimeBankGroup && timeBank >= shortageHours) {
-                 useTimeBankGroup.style.display = 'flex';
-                 if (timeBankDisplay) timeBankDisplay.innerText = timeBank.toFixed(1);
-                 
-                 if (useTimeBankCheckbox && useTimeBankCheckbox.checked) {
-                     useTimeBank = true; // Mark as used
-                     reasons.push(`使用时间银行抵扣${shortageHours.toFixed(1)}h`);
-                     applyPenalty = false;
+            if (useTimeBankGroup) {
+                 if (timeBank >= shortageHours) {
+                     useTimeBankGroup.style.display = 'flex';
+                     if (timeBankDisplay) timeBankDisplay.innerText = timeBank.toFixed(1);
+                     
+                     if (useTimeBankCheckbox && useTimeBankCheckbox.checked) {
+                         useTimeBank = true; // Mark as used
+                         reasons.push(`使用时间银行抵扣${shortageHours.toFixed(1)}h`);
+                         applyPenalty = false;
+                     } else {
+                         useTimeBank = false;
+                     }
                  } else {
+                     useTimeBankGroup.style.display = 'none';
+                     if (useTimeBankCheckbox) useTimeBankCheckbox.checked = false;
                      useTimeBank = false;
                  }
             } else {
-                 if (useTimeBankGroup) useTimeBankGroup.style.display = 'none';
-                 if (useTimeBankCheckbox) useTimeBankCheckbox.checked = false;
                  useTimeBank = false;
             }
 
@@ -10363,6 +10367,8 @@
                             wishes: wishList,
                             strategies: userStrategies,
                             timeBank: timeBank,
+                            wallet: getWallet(),
+                            debt: getDebt(),
                             timerRecords: timerRecords,
                             plannedTasks: plannedTasks,
                             dailyReviews: dailyReviews,
