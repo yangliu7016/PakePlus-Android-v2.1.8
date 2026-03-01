@@ -586,7 +586,13 @@
                 max-height: none !important; 
             }
         }
-    </style>
+        .custom-modal .input-group#useTimeBankGroup { 
+        display: none !important; 
+    }
+    .custom-modal .input-group#useTimeBankGroup.show-flex { 
+        display: flex !important; 
+    }
+</style>
 </head>
 <body onclick="if(event.target.id === 'todoSelectModal') closeTodoSelectModal(); else closeAllMenus(event);">
 
@@ -649,7 +655,7 @@
                 <div class="notif-btn" onclick="unpinTask()">✕</div>
             </div>
         </div>
-        <!-- 置顶倒数日 -->
+        <!-- 置顶小挂件 (体重 + 倒数日) -->
         <div id="notifDaysMatter" class="notif-item" style="display:none; background:var(--bg-card); border:1px solid var(--border); padding:4px 8px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px;"></div>
     </div>
 
@@ -892,6 +898,26 @@
         </div>
 
         <div class="card">
+            <div class="card-title">界面设置</div>
+            <div class="input-group">
+                <label class="input-label">显示模块</label>
+                <div class="row" style="flex-wrap: wrap; gap: 10px;">
+                    <label id="label-showTimer" class="privacy-check-label" style="margin-bottom:0; flex:1; min-width:80px;"><input type="checkbox" id="showTimer" onchange="updateInterfaceOption('showTimer')"> 计时</label>
+                    <label id="label-showStats" class="privacy-check-label" style="margin-bottom:0; flex:1; min-width:80px;"><input type="checkbox" id="showStats" onchange="updateInterfaceOption('showStats')"> 统计</label>
+                    <label id="label-showShop" class="privacy-check-label" style="margin-bottom:0; flex:1; min-width:80px;"><input type="checkbox" id="showShop" onchange="updateInterfaceOption('showShop')"> 商店</label>
+                    <label id="label-showQuickStudy" class="privacy-check-label" style="margin-bottom:0; flex:1; min-width:80px;"><input type="checkbox" id="showQuickStudy" onchange="updateInterfaceOption('showQuickStudy')"> 学习按钮</label>
+                </div>
+            </div>
+            <div class="input-group" style="margin-top:12px; padding-top:12px; border-top:1px dashed var(--border);">
+                <label class="input-label">挂件每行显示数量 (体重/倒数日)</label>
+                <div style="display:flex; align-items:center; gap:12px;">
+                    <input type="number" id="setWidgetCols" min="1" max="6" style="flex:1;">
+                    <button class="btn-mini" style="width:auto; padding:8px 16px;" onclick="saveWidgetCols()">保存</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
             <div class="card-title">奖惩 (元)</div>
             <div class="row" style="margin-bottom:12px;">
                 <div class="input-group" style="padding:12px; border-radius:12px; border:1px solid var(--warning); margin-bottom:0;">
@@ -1120,6 +1146,15 @@
                 <button class="btn-mini" style="background:var(--time); color:#fff; width:auto; padding:12px 20px;" onclick="executeExchangeFromModal()">兑换</button>
             </div>
             
+            <div style="border-top:1px dashed var(--border); margin:20px 0 16px 0;"></div>
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+                <div class="modal-title" style="margin:0; font-size:16px; color:var(--text-main);">⚖️ 体重记录</div>
+                <button class="btn-mini" style="width:auto; margin:0; padding: 4px 10px;" onclick="addWeightRecord()">➕</button>
+            </div>
+            <div id="weightSummary" style="background:var(--input-bg); border-radius:8px; padding:10px; font-size:13px; color:var(--text-main); margin-bottom:16px; display:none;">
+                <!-- 由 JS 填充 -->
+            </div>
+
             <div style="border-top:1px dashed var(--border); margin:20px 0 16px 0;"></div>
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
                 <div class="modal-title" style="margin:0; font-size:16px; color:var(--text-main);">📅 倒数日</div>
@@ -1548,6 +1583,8 @@
     let ghConfig = safeParse('habit_gh_v1', { token: '', repo: '', path: 'habit_backup.json' });
     let giteeConfig = safeParse('habit_gitee_v1', { token: '', repo: '', path: 'habit_backup.json' });
     let daysMatterList = safeParse('habit_days_matter_v1', []);
+    let weightLog = safeParse('habit_weight_log_v1', []); // 体重记录
+
     let currentTheme = localStorage.getItem('habit_theme') || 'dark';
     let todayIsWeekend = false;
     let isDeleting = false;
@@ -2050,6 +2087,29 @@
             
             daysMatterList = localDaysMatterArray;
         }
+
+        // 合并体重记录：按日期合并，保留最新值
+        if (cloudData.weightLog && Array.isArray(cloudData.weightLog)) {
+            const localWeightLog = localData.weightLog || weightLog || [];
+            const weightMap = new Map();
+            
+            // 先放本地的
+            localWeightLog.forEach(item => {
+                if (item && item.date) weightMap.set(item.date, item.weight);
+            });
+            
+            // 叠加云端的
+            cloudData.weightLog.forEach(item => {
+                if (item && item.date) {
+                    // 如果云端有更晚或同样的日期，覆盖（或者我们可以根据时间戳，但这里只有日期）
+                    // 简单起见，合并所有日期
+                    weightMap.set(item.date, item.weight);
+                }
+            });
+            
+            weightLog = Array.from(weightMap.entries()).map(([date, weight]) => ({ date, weight }));
+            weightLog.sort((a, b) => a.date.localeCompare(b.date));
+        }
         
         // 保存合并后的数据到本地
         persistAllLocal();
@@ -2082,6 +2142,7 @@
         localStorage.setItem('habit_daily_reviews_v1', JSON.stringify(dailyReviews));
         localStorage.setItem('habit_task_usage_v1', JSON.stringify(taskUsageCount));
         localStorage.setItem('habit_days_matter_v1', JSON.stringify(daysMatterList));
+        localStorage.setItem('habit_weight_log_v1', JSON.stringify(weightLog));
     }
 
     function setSyncBadgeStatus(status, text) {
@@ -2935,6 +2996,7 @@
             const checkinCard = document.querySelector('#checkinModalCheckinArea .card');
             if (checkinCard) {
                 Array.from(checkinCard.children).forEach(child => {
+                    // 不重置历史区域的显示状态
                     if (child.id !== 'checkinModalHistoryCheckinArea') child.style.display = '';
                 });
             }
@@ -3379,28 +3441,15 @@
         
         children.forEach(child => {
             if (child === title || child === historyArea) return;
-            // 隐藏/显示其他元素
-            child.style.display = isCheckinModalHistoryCheckinOpen ? 'none' : 'block'; // 注意：row是flex布局，直接设block可能破坏样式。
-            // 更好的方式：如果原来是flex，要恢复flex。但row类定义了display:flex吗？
-            // 看前面代码：<div class="row">...</div> usually implies flex in frameworks, but here let's check.
-            // 在 index.html 头部可能有 .row { display: flex; gap: 10px; }
-            // 简单起见，如果 child 包含 row class，恢复时设为 flex，否则 block。
-            if (!isCheckinModalHistoryCheckinOpen) {
-                 if (child.classList.contains('row')) child.style.display = 'flex';
-                 else if (child.id === 'checkinModalPenaltyReasonBox') {
-                     // 特殊处理原因框，只有当有惩罚时才显示？或者保持原样
-                     // 这里的隐藏是针对"切换到历史模式"，恢复时应该恢复到"输入模式"。
-                     // 输入模式下，reasonBox 是根据逻辑显示的。
-                     // 简单粗暴：恢复显示时，全部设为 '' (remove inline display style)，让 CSS class 控制？
-                     // 但是 row 是 div，默认 block，如果有 css .row { display: flex } 就可以。
-                     child.style.display = ''; 
-                     // 对于 penaltyReasonBox，它默认是 none。如果仅仅 remove inline style，它会变回 none (assuming it has style="display:none" initially or in css).
-                     // 只要 checkCheckinModalPenaltyChange 会被调用，状态就会修正。
-                 } else {
-                     child.style.display = '';
-                 }
-            } else {
+            
+            if (isCheckinModalHistoryCheckinOpen) {
                 child.style.display = 'none';
+            } else {
+                if (child.classList.contains('row')) {
+                    child.style.display = 'flex';
+                } else {
+                    child.style.display = ''; // 移除 inline style，由 CSS 或其他逻辑决定显示
+                }
             }
         });
         
@@ -4479,9 +4528,9 @@
             const shortageHours = Math.abs(studyDiff); // 少学的小时数
             let applyPenalty = true;
             
-            // Check if Time Bank has enough balance
-            if (useTimeBankGroup && timeBank >= shortageHours) {
-                 useTimeBankGroup.style.display = 'flex';
+            // Check if Time Bank has enough balance (using a small tolerance for floating point precision)
+            if (useTimeBankGroup && timeBank >= (shortageHours - 0.001)) {
+                 useTimeBankGroup.classList.add('show-flex');
                  if (timeBankDisplay) timeBankDisplay.innerText = timeBank.toFixed(1);
                  
                  if (useTimeBankCheckbox && useTimeBankCheckbox.checked) {
@@ -4492,7 +4541,7 @@
                      useTimeBank = false;
                  }
             } else {
-                 if (useTimeBankGroup) useTimeBankGroup.style.display = 'none';
+                 if (useTimeBankGroup) useTimeBankGroup.classList.remove('show-flex');
                  if (useTimeBankCheckbox) useTimeBankCheckbox.checked = false;
                  useTimeBank = false;
             }
@@ -4516,7 +4565,7 @@
                 }
             }
         } else {
-            if (useTimeBankGroup) useTimeBankGroup.style.display = 'none';
+            if (useTimeBankGroup) useTimeBankGroup.classList.remove('show-flex');
             if (useTimeBankCheckbox) useTimeBankCheckbox.checked = false;
             useTimeBank = false;
         }
@@ -7531,9 +7580,9 @@
             notifPinned.style.display = 'none';
         }
 
-        // 3. 更新置顶倒数日
-        if (typeof renderPinnedDaysMatter === 'function') {
-            if (renderPinnedDaysMatter()) {
+        // 3. 更新置顶挂件 (体重 + 倒数日)
+        if (typeof renderPinnedWidgets === 'function') {
+            if (renderPinnedWidgets()) {
                 hasContent = true;
             }
         }
@@ -8744,6 +8793,7 @@
             if(data.dailyReviews) localStorage.setItem('habit_daily_reviews_v1', JSON.stringify(data.dailyReviews));
             if(data.taskUsageCount) localStorage.setItem('habit_task_usage_v1', JSON.stringify(data.taskUsageCount));
             if(data.daysMatterList) localStorage.setItem('habit_days_matter_v1', JSON.stringify(data.daysMatterList));
+            if(data.weightLog) localStorage.setItem('habit_weight_log_v1', JSON.stringify(data.weightLog));
             if(data.timerRecords) localStorage.setItem('habit_timer_records_v1', JSON.stringify(data.timerRecords));
             if(data.plannedTasks) localStorage.setItem('habit_planned_tasks_v1', JSON.stringify(data.plannedTasks));
             if(data.wallet !== undefined) localStorage.setItem('habit_wallet_v1', data.wallet);
@@ -8763,6 +8813,7 @@
         localStorage.setItem('habit_timer_records_v1', JSON.stringify(timerRecords));
         localStorage.setItem('habit_planned_tasks_v1', JSON.stringify(plannedTasks));
         localStorage.setItem('habit_daily_reviews_v1', JSON.stringify(dailyReviews));
+        localStorage.setItem('habit_weight_log_v1', JSON.stringify(weightLog));
         // 计时器状态已经由saveTimerState()单独保存
         syncAll('push', true);
     }
@@ -8937,6 +8988,13 @@
         const we = config.weekend || [0, 6];
         document.getElementById('btn_week_6').className = `week-btn ${we.includes(6)?'active':''}`;
         document.getElementById('btn_week_0').className = `week-btn ${we.includes(0)?'active':''}`;
+
+        // AIGC START: 应用主题
+        if (currentTheme) {
+            document.body.className = currentTheme;
+            if (typeof updateThemeButtons === 'function') updateThemeButtons();
+        }
+        // AIGC END
 
         renderQuickTaskSettings();
         renderTodoTimeChipSettings();
@@ -9293,6 +9351,60 @@
         
         localStorage.setItem('habit_config_v7', JSON.stringify(config));
         applyInterfaceSettings();
+        
+        // 应用挂件设置到输入框 (如果是Modal内)
+        if (isModalOpen && modalContent) {
+            const modalCols = modalContent.querySelector('#setWidgetCols');
+            if (modalCols) modalCols.value = config.widgetCols || 4;
+        }
+        
+        triggerAutoSave();
+    }
+    
+    // 保存挂件列数设置
+    function saveWidgetCols() {
+        // 优先从modal中查找元素
+        const settingsModal = document.getElementById('settingsModal');
+        const isModalOpen = settingsModal && settingsModal.classList.contains('show');
+        const modalContent = isModalOpen ? document.getElementById('settingsModalContent') : null;
+        
+        const getEl = (elId) => {
+            if (isModalOpen && modalContent) {
+                const el = modalContent.querySelector('#' + elId);
+                if (el) return el;
+            }
+            return document.getElementById(elId);
+        };
+        
+        const input = getEl('setWidgetCols');
+        if (!input) return;
+        
+        let val = parseInt(input.value);
+        if (isNaN(val) || val < 1) val = 1;
+        if (val > 6) val = 6;
+        
+        config.widgetCols = val;
+        localStorage.setItem('habit_config_v7', JSON.stringify(config));
+        
+        // 同设置页面的其他逻辑一样，也要更新主页面的输入框以保持一致
+        const mainInput = document.getElementById('setWidgetCols');
+        if (mainInput && mainInput !== input) mainInput.value = val;
+        
+        // 同步更新UI
+        renderPinnedWidgets();
+        
+        // 提示
+        const btn = event.target;
+        const originalText = btn.innerText;
+        btn.innerText = '✅ 已保存';
+        btn.style.background = 'var(--success)';
+        btn.style.color = '#fff';
+        setTimeout(() => {
+            btn.innerText = originalText;
+            btn.style.background = '';
+            btn.style.color = '';
+        }, 1500);
+        
         triggerAutoSave();
     }
     
@@ -9334,6 +9446,12 @@
             if (labelQuickStudy) {
                 labelQuickStudy.classList.toggle('checked', interfaceConfig.showQuickStudy !== false);
             }
+        }
+        
+        // 应用挂件列数设置
+        const setWidgetColsInput = document.getElementById('setWidgetCols');
+        if (setWidgetColsInput) {
+            setWidgetColsInput.value = config.widgetCols || 4;
         }
         
         // 显示/隐藏对应的选项卡
@@ -9908,6 +10026,21 @@
                     
                     // 配置和时间银行直接使用云端的（这些不需要合并）
                     if(cloudData.config) config = cloudData.config;
+                    if(cloudData.theme) {
+                        currentTheme = cloudData.theme;
+                        localStorage.setItem('habit_theme_v1', currentTheme);
+                    }
+                    if(cloudData.ghConfig) {
+                        // 仅同步仓库名和路径，保留本地 Token 确保安全
+                        ghConfig.repo = cloudData.ghConfig.repo || ghConfig.repo;
+                        ghConfig.path = cloudData.ghConfig.path || ghConfig.path;
+                        localStorage.setItem('habit_gh_v1', JSON.stringify(ghConfig));
+                    }
+                    if(cloudData.giteeConfig) {
+                        giteeConfig.repo = cloudData.giteeConfig.repo || giteeConfig.repo;
+                        giteeConfig.path = cloudData.giteeConfig.path || giteeConfig.path;
+                        localStorage.setItem('habit_gitee_v1', JSON.stringify(giteeConfig));
+                    }
                     if(cloudData.pinnedTaskId) {
                         pinnedTaskId = cloudData.pinnedTaskId;
                         localStorage.setItem('habit_pinned_task_id', pinnedTaskId);
@@ -9915,6 +10048,10 @@
                     if(cloudData.daysMatterList) {
                         daysMatterList = cloudData.daysMatterList;
                         localStorage.setItem('habit_days_matter_v1', JSON.stringify(daysMatterList));
+                    }
+                    if(cloudData.weightLog) {
+                        weightLog = cloudData.weightLog;
+                        localStorage.setItem('habit_weight_log_v1', JSON.stringify(weightLog));
                     }
                     if(cloudData.timeBank !== undefined) timeBank = cloudData.timeBank;
                     if(cloudData.wallet !== undefined) setWallet(cloudData.wallet);
@@ -9976,6 +10113,27 @@
                         taskUsageCount: taskUsageCount || {},
                         daysMatterList: daysMatterList || []
                     });
+                    
+                    // AIGC START: 如果云端较新，设置也应使用云端的
+                    if (cloudData.config) config = cloudData.config;
+                    if (cloudData.theme) {
+                        currentTheme = cloudData.theme;
+                        localStorage.setItem('habit_theme_v1', currentTheme);
+                    }
+                    if (cloudData.ghConfig) {
+                        ghConfig.repo = cloudData.ghConfig.repo || ghConfig.repo;
+                        ghConfig.path = cloudData.ghConfig.path || ghConfig.path;
+                        localStorage.setItem('habit_gh_v1', JSON.stringify(ghConfig));
+                    }
+                    if (cloudData.giteeConfig) {
+                        giteeConfig.repo = cloudData.giteeConfig.repo || giteeConfig.repo;
+                        giteeConfig.path = cloudData.giteeConfig.path || giteeConfig.path;
+                        localStorage.setItem('habit_gitee_v1', JSON.stringify(giteeConfig));
+                    }
+                    if (cloudData.timeBank !== undefined) timeBank = cloudData.timeBank;
+                    if (cloudData.wallet !== undefined) setWallet(cloudData.wallet);
+                    if (cloudData.debt !== undefined) setDebt(cloudData.debt);
+                    // AIGC END
                 }
                 
                 // 获取当前计时器状态
@@ -9990,6 +10148,9 @@
                     timestamp: Date.now(),
                     data: stripImagesFromHistory(historyData),
                     config,
+                    theme: currentTheme, // 新增：主题同步
+                    ghConfig: { repo: ghConfig.repo, path: ghConfig.path }, // 新增：同步仓库信息（不含Token）
+                    giteeConfig: { repo: giteeConfig.repo, path: giteeConfig.path }, // 新增：同步仓库信息（不含Token）
                     todos: todoList,
                     deletedTodoIds: typeof deletedTodoIds !== 'undefined' ? deletedTodoIds : [],
                     wishes: wishList,
@@ -10003,7 +10164,8 @@
                     taskUsageCount: taskUsageCount,
                     pinnedTaskId: pinnedTaskId,
                     timerState: timerState, // 包含计时器状态
-                    daysMatterList: daysMatterList // 倒数日
+                    daysMatterList: daysMatterList, // 倒数日
+                    weightLog: weightLog // 体重记录
                 };
 
                 const body = {
@@ -10194,10 +10356,33 @@
                         timerRecords: timerRecords || [],
                         plannedTasks: plannedTasks || [],
                         dailyReviews: dailyReviews || {},
-                        taskUsageCount: taskUsageCount || {}
+                        taskUsageCount: taskUsageCount || {},
+                        daysMatterList: cloudData.daysMatterList || [] // 修复：Gitee 同步也包含倒数日
                     });
                     
                     if(cloudData.config) config = cloudData.config;
+                    if(cloudData.theme) {
+                        currentTheme = cloudData.theme;
+                        localStorage.setItem('habit_theme_v1', currentTheme);
+                    }
+                    if(cloudData.ghConfig) {
+                        ghConfig.repo = cloudData.ghConfig.repo || ghConfig.repo;
+                        ghConfig.path = cloudData.ghConfig.path || ghConfig.path;
+                        localStorage.setItem('habit_gh_v1', JSON.stringify(ghConfig));
+                    }
+                    if(cloudData.giteeConfig) {
+                        giteeConfig.repo = cloudData.giteeConfig.repo || giteeConfig.repo;
+                        giteeConfig.path = cloudData.giteeConfig.path || giteeConfig.path;
+                        localStorage.setItem('habit_gitee_v1', JSON.stringify(giteeConfig));
+                    }
+                    if(cloudData.daysMatterList) {
+                        daysMatterList = cloudData.daysMatterList;
+                        localStorage.setItem('habit_days_matter_v1', JSON.stringify(daysMatterList));
+                    }
+                    if(cloudData.weightLog) {
+                        weightLog = cloudData.weightLog;
+                        localStorage.setItem('habit_weight_log_v1', JSON.stringify(weightLog));
+                    }
                     if(cloudData.pinnedTaskId) {
                         pinnedTaskId = cloudData.pinnedTaskId;
                         localStorage.setItem('habit_pinned_task_id', pinnedTaskId);
@@ -10246,6 +10431,27 @@
                         taskUsageCount: taskUsageCount || {},
                         daysMatterList: daysMatterList || []
                     });
+                    
+                    // AIGC START: 如果云端较新，设置也应使用云端的
+                    if (cloudData.config) config = cloudData.config;
+                    if (cloudData.theme) {
+                        currentTheme = cloudData.theme;
+                        localStorage.setItem('habit_theme_v1', currentTheme);
+                    }
+                    if (cloudData.ghConfig) {
+                        ghConfig.repo = cloudData.ghConfig.repo || ghConfig.repo;
+                        ghConfig.path = cloudData.ghConfig.path || ghConfig.path;
+                        localStorage.setItem('habit_gh_v1', JSON.stringify(ghConfig));
+                    }
+                    if (cloudData.giteeConfig) {
+                        giteeConfig.repo = cloudData.giteeConfig.repo || giteeConfig.repo;
+                        giteeConfig.path = cloudData.giteeConfig.path || giteeConfig.path;
+                        localStorage.setItem('habit_gitee_v1', JSON.stringify(giteeConfig));
+                    }
+                    if (cloudData.timeBank !== undefined) timeBank = cloudData.timeBank;
+                    if (cloudData.wallet !== undefined) setWallet(cloudData.wallet);
+                    if (cloudData.debt !== undefined) setDebt(cloudData.debt);
+                    // AIGC END
                 }
                 
                 const timerStateStr = localStorage.getItem('habit_timer_state_v1');
@@ -10255,6 +10461,9 @@
                     timestamp: Date.now(),
                     data: stripImagesFromHistory(historyData),
                     config,
+                    theme: currentTheme, // 新增：主题同步
+                    ghConfig: { repo: ghConfig.repo, path: ghConfig.path }, // 新增：同步仓库信息（不含Token）
+                    giteeConfig: { repo: giteeConfig.repo, path: giteeConfig.path }, // 新增：同步仓库信息（不含Token）
                     todos: todoList,
                     deletedTodoIds: typeof deletedTodoIds !== 'undefined' ? deletedTodoIds : [],
                     wishes: wishList,
@@ -10268,7 +10477,8 @@
                     taskUsageCount: taskUsageCount,
                     pinnedTaskId: pinnedTaskId,
                     timerState: timerState,
-                    daysMatterList: daysMatterList
+                    daysMatterList: daysMatterList,
+                    weightLog: weightLog
                 };
 
                 const body = {
@@ -10732,24 +10942,70 @@
         updateStickyNotif();
     }
 
-    // 渲染置顶倒数日（在主页顶部）
-    function renderPinnedDaysMatter() {
+    // 渲染置顶挂件 (体重 + 倒数日)
+    function renderPinnedWidgets() {
         const container = document.getElementById('notifDaysMatter');
+        const summaryEl = document.getElementById('weightSummary');
         if (!container) return false;
         
-        const pinnedItems = daysMatterList.filter(item => item.pinned === true || item.pinned === 'true');
+        // 设置网格列数
+        const gridCols = config.widgetCols || 4;
+        container.style.gridTemplateColumns = `repeat(${gridCols}, 1fr)`;
         
-        if (pinnedItems.length === 0) {
-            container.style.display = 'none';
-            return false;
+        let html = '';
+        let hasItems = false;
+        
+        // 1. 添加体重项
+        if (weightLog && weightLog.length > 0) {
+            const latest = weightLog[weightLog.length - 1];
+            const prev = weightLog.length > 1 ? weightLog[weightLog.length - 2] : null;
+            
+            let diffText = '--';
+            let diffColor = 'var(--text-sub)';
+            let diffHtml = '--';
+            
+            if (prev) {
+                const diff = latest.weight - prev.weight;
+                const sign = diff > 0 ? '+' : '';
+                diffText = sign + diff.toFixed(1);
+                diffColor = diff > 0 ? 'var(--danger)' : (diff < 0 ? 'var(--success)' : 'var(--text-sub)');
+                diffHtml = `<span style="color:${diffColor}">${diffText} kg</span>`;
+            }
+
+            // 更新弹窗中的摘要 (保持原来的逻辑)
+            if (summaryEl) {
+                summaryEl.style.display = 'block';
+                summaryEl.innerHTML = `
+                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                        <span>最新: <strong>${latest.weight.toFixed(1)} kg</strong></span>
+                        <span>变化: <strong>${diffHtml}</strong></span>
+                    </div>
+                    <div style="font-size:11px; color:var(--text-sub); margin-top:4px;">记录日期: ${latest.date}</div>
+                `;
+            }
+
+            html += `
+                <div style="display:flex; flex-direction:column; align-items:center; background:var(--input-bg); border-radius:4px; padding:4px; font-size:11px; cursor:pointer;" onclick="addWeightRecord()">
+                    <span style="font-weight:600;">体重</span>
+                    <div style="display:flex; align-items:baseline; gap:2px;">
+                        <span style="color:var(--primary); font-weight:bold;">${latest.weight.toFixed(1)}</span>
+                        <span style="font-size:9px; opacity:0.8;">kg</span>
+                        <span style="color:${diffColor}; font-size:10px; margin-left:2px;">${diffText !== '--' ? '(' + diffText + ')' : ''}</span>
+                    </div>
+                </div>
+            `;
+            hasItems = true;
+        } else if (summaryEl) {
+            summaryEl.style.display = 'none';
         }
-        
-        container.style.display = 'grid';
-        container.innerHTML = pinnedItems.map(item => {
+
+        // 2. 添加置顶倒数日项
+        const pinnedDaysMatter = daysMatterList.filter(item => item.pinned === true || item.pinned === 'true');
+        pinnedDaysMatter.forEach(item => {
             const today = getLocalTodayStr();
             const diff = getTimeDiffDays(today, item.date);
             let diffText = '';
-            let colorClass = ''; // For text color
+            let colorClass = '';
             
             if (diff > 0) {
                 diffText = `${diff}天`;
@@ -10762,15 +11018,66 @@
                 colorClass = 'color:var(--warning); font-weight:bold;';
             }
             
-            return `
+            html += `
                 <div style="display:flex; flex-direction:column; align-items:center; background:var(--input-bg); border-radius:4px; padding:4px; font-size:11px;">
                     <span style="font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:100%;">${item.name}</span>
                     <span style="${colorClass}">${diffText}</span>
                 </div>
             `;
-        }).join('');
+            hasItems = true;
+        });
         
+        if (!hasItems) {
+            container.style.display = 'none';
+            return false;
+        }
+        
+        container.style.display = 'grid';
+        container.innerHTML = html;
         return true;
+    }
+
+    // 添加体重记录
+    function addWeightRecord() {
+        const lastWeight = weightLog.length > 0 ? weightLog[weightLog.length - 1].weight : 60;
+        
+        showModal({
+            title: '记录体重',
+            message: '输入今天的体重 (kg)',
+            inputs: [
+                { id: 'weightInput', label: '体重 (kg)', type: 'number', value: lastWeight.toString(), placeholder: '例如: 65.5' }
+            ],
+            buttons: [
+                { text: '取消', primary: false, callback: () => {} },
+                { 
+                    text: '记录', 
+                    primary: true, 
+                    callback: (values) => {
+                        const weight = parseFloat(values.weightInput);
+                        if (isNaN(weight) || weight <= 0) {
+                            alert('请输入有效的体重数值');
+                            return;
+                        }
+                        
+                        const today = getLocalTodayStr();
+                        const existingIdx = weightLog.findIndex(r => r.date === today);
+                        
+                        if (existingIdx > -1) {
+                            weightLog[existingIdx].weight = weight;
+                        } else {
+                            weightLog.push({ date: today, weight: weight });
+                        }
+                        
+                        // 保持排序
+                        weightLog.sort((a, b) => a.date.localeCompare(b.date));
+                        
+                        localStorage.setItem('habit_weight_log_v1', JSON.stringify(weightLog));
+                        triggerAutoSave();
+                        updateStickyNotif();
+                    }
+                }
+            ]
+        });
     }
 
     // 添加倒数日
