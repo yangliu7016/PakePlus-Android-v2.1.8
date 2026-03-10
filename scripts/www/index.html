@@ -897,7 +897,7 @@
              <button class="btn-calc" style="margin-top:20px;" onclick="saveSettings()">💾 保存</button>
         </div>
 
-        <div class="card">
+        <div id="interfaceSettingsCard" class="card" style="display:none;">
             <div class="card-title">界面设置</div>
             <div class="input-group">
                 <label class="input-label">显示模块</label>
@@ -2893,6 +2893,22 @@
         }
     }
 
+    (function() {
+        function debtReminderAutoOpen() {
+            const now = new Date();
+            if (now.getDay() !== 1) return;
+            const debt = getDebt();
+            if (Number(debt) > 0) {
+                showDebtModal();
+            }
+        }
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', debtReminderAutoOpen);
+        } else {
+            debtReminderAutoOpen();
+        }
+    })();
+
     function closeDebtModal() {
         const modal = document.getElementById('debtModal');
         if (modal) modal.classList.remove('show');
@@ -3069,8 +3085,25 @@
         }
         
         // 显示modal
+        localStorage.setItem('checkinModalOpenedDate', getLocalTodayStr());
         modal.classList.add('show');
     }
+
+    (function() {
+        function autoOpen() {
+            const now = new Date();
+            if (now.getHours() < 7) return;
+            const today = getLocalTodayStr();
+            const opened = localStorage.getItem('checkinModalOpenedDate');
+            const debtModalOpen = !!(document.getElementById('debtModal') && document.getElementById('debtModal').classList.contains('show'));
+            if (!debtModalOpen && opened !== today) showCheckinModal();
+        }
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', autoOpen);
+        } else {
+            autoOpen();
+        }
+    })();
 
     function closeCheckinModal() {
         const modal = document.getElementById('checkinModal');
@@ -3669,8 +3702,11 @@
             const hasReview = r.great || r.improve;
             
             if (!r || (!hasReview && !hasLegacy && !hasList)) return false;
-            
-            if (currentFilter && r.title !== currentFilter) return false;
+            if (currentFilter) {
+                const titles = (r.list || []).map(i => i.title).filter(Boolean);
+                const matchTitle = (r.title === currentFilter) || titles.includes(currentFilter);
+                if (!matchTitle) return false;
+            }
             
             if (currentSearch) {
                 const listContent = (r.list || []).map(i => (i.title || '') + (i.content || '')).join(' ');
@@ -3719,12 +3755,18 @@
                 const r = dailyReviews[date];
                 let fullContentParts = [];
 
-                if (r.great) fullContentParts.push(`<b>做得好的:</b><br>${r.great.replace(/\n/g, '<br>')}`);
-                if (r.improve) fullContentParts.push(`<b>需改进的:</b><br>${r.improve.replace(/\n/g, '<br>')}`);
+                if (!currentFilter) {
+                    if (r.great) fullContentParts.push(`<b>做得好的:</b><br>${r.great.replace(/\n/g, '<br>')}`);
+                    if (r.improve) fullContentParts.push(`<b>需改进的:</b><br>${r.improve.replace(/\n/g, '<br>')}`);
+                }
 
                 let listItems = r.list || [];
                 if (listItems.length === 0 && (r.insight || r.title)) {
                     listItems.push({ title: r.title, content: r.insight });
+                }
+
+                if (currentFilter) {
+                    listItems = listItems.filter(i => i.title === currentFilter);
                 }
 
                 if (listItems.length > 0) {
@@ -3761,10 +3803,10 @@
                         displayContent = firstItem.content.split('\n')[0];
                         if (listItems.length > 1) displayContent += ` (+${listItems.length-1})`;
                     }
-                } else if (r.great) {
+                } else if (!currentFilter && r.great) {
                     displayTitleHtml = `<span style="font-size:11px; padding:2px 6px; background:var(--success-bg); color:var(--success); border-radius:4px; margin-right:6px; flex-shrink:0;">好</span>`;
                     displayContent = r.great.split('\n')[0];
-                } else if (r.improve) {
+                } else if (!currentFilter && r.improve) {
                     displayTitleHtml = `<span style="font-size:11px; padding:2px 6px; background:var(--warning-bg); color:var(--warning); border-radius:4px; margin-right:6px; flex-shrink:0;">改</span>`;
                     displayContent = r.improve.split('\n')[0];
                 }
@@ -6679,6 +6721,17 @@
                 currentDebt -= dChange;
                 setDebt(currentDebt);
                 alert(`🔄 待罚金已回滚: ${dChange > 0 ? '-' : '+'}${Math.abs(dChange)}`);
+            }
+
+            const f = parseFloat(record.fund);
+            if ((!wChange && !dChange) && Number.isFinite(f) && f !== 0) {
+                if (f > 0) {
+                    addWallet(-f);
+                    alert(`🔄 积分回滚: -${Math.abs(f)}`);
+                } else {
+                    addDebt(-Math.abs(f));
+                    alert(`🔄 积分回滚: +${Math.abs(f)}`);
+                }
             }
 
             historyData = historyData.filter(i => i.id !== id);
